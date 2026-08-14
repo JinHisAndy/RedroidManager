@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redroid Manager</title>
+<style>
+:root { --bg:#0f1117; --card:#1a1d27; --border:#2a2d3a; --accent:#6c5ce7; --green:#00d2a0; --red:#ff5e5e; --text:#e0e0e0; --dim:#7a7d8a; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height:100vh; }
+header { background:var(--card); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; }
+header h1 { font-size:20px; font-weight:600; }
+.host-stats { display:flex; gap:20px; font-size:13px; color:var(--dim); }
+.host-stats span b { color:var(--text); }
+main { max-width:1200px; margin:0 auto; padding:24px; }
+.toolbar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.btn { padding:10px 20px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:.2s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { opacity:.85; }
+.btn-danger { background:var(--red); color:#fff; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+.btn-sm { padding:4px 10px; font-size:12px; }
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+table { width:100%; border-collapse:collapse; background:var(--card); border-radius:8px; overflow:hidden; }
+th,td { padding:12px 16px; text-align:left; font-size:13px; }
+th { background:var(--border); color:var(--dim); font-weight:500; text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
+td { border-bottom:1px solid var(--border); }
+tr:last-child td { border-bottom:none; }
+.status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; font-weight:600; }
+.status-running { background:rgba(0,210,160,.15); color:var(--green); }
+.status-stopped { background:rgba(255,94,94,.15); color:var(--red); }
+.status-other { background:rgba(122,125,138,.15); color:var(--dim); }
+.adb-cmd { font-family:monospace; font-size:11px; background:var(--bg); padding:4px 8px; border-radius:4px; cursor:pointer; }
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; justify-content:center; align-items:center; }
+.modal-overlay.active { display:flex; }
+.modal { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:24px; width:420px; max-height:80vh; overflow-y:auto; }
+.modal h2 { margin-bottom:16px; font-size:18px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
+.form-group input,.form-group select { width:100%; padding:8px 12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; }
+.form-row { display:flex; gap:10px; }
+.form-row .form-group { flex:1; }
+.apk-section { background:var(--card); border-radius:8px; padding:20px; margin-bottom:20px; }
+.apk-section h3 { font-size:15px; margin-bottom:14px; }
+.apk-toolbar { display:flex; gap:10px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
+.apk-table { width:100%; border-collapse:collapse; }
+.apk-table td { padding:8px 12px; font-size:12px; }
+.apk-table tr:hover td { background:rgba(108,92,231,.05); }
+.apk-actions { display:flex; gap:6px; }
+.apk-actions button { padding:3px 8px; font-size:11px; }
+.toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:8px; font-size:13px; z-index:200; animation:slideIn .3s; }
+.toast-success { background:var(--green); color:#000; }
+.toast-error { background:var(--red); color:#fff; }
+@keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+.empty-state { text-align:center; padding:60px 20px; color:var(--dim); }
+.empty-state p { margin-bottom:16px; }
+.checkbox { width:16px; height:16px; accent-color:var(--accent); }
+.screen-container { display:flex; flex-direction:column; max-width:420px; width:95vw; max-height:95vh; background:var(--card); border-radius:16px; overflow:hidden; border:1px solid var(--border); }
+.screen-toolbar { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.3); gap:8px; }
+.screen-toolbar span { font-size:13px; font-weight:600; white-space:nowrap; }
+.screen-toolbar-right { display:flex; gap:4px; align-items:center; flex-shrink:0; }
+.fps-badge { font-size:10px; padding:2px 6px; border-radius:10px; background:rgba(0,210,160,.15); color:var(--green); font-family:monospace; white-space:nowrap; }
+.fps-badge.error { background:rgba(255,94,94,.15); color:var(--red); }
+.screen-body { flex:1; display:flex; justify-content:center; align-items:flex-start; padding:8px 12px; background:#111; overflow-y:auto; overflow-x:hidden; min-height:0; }
+.phone-frame { position:relative; width:100%; max-width:280px; background:#1a1a1a; border-radius:24px; padding:6px 3px 0; box-shadow:0 0 0 3px #333, 0 0 0 6px #1a1a1a, 0 8px 32px rgba(0,0,0,.5); transition:transform .3s, max-width .3s; margin:0 auto; }
+.phone-frame.naked { background:transparent; border-radius:0; padding:0; box-shadow:none; }
+.phone-frame.naked .phone-notch { display:none; }
+.phone-notch { width:60px; height:6px; background:#444; border-radius:3px; margin:0 auto 6px; }
+.nav-btn-inline { width:24px; height:24px; border-radius:50%; border:1.5px solid var(--dim); color:var(--dim); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:11px; transition:.2s; flex-shrink:0; }
+.nav-btn-inline:hover { background:rgba(255,255,255,.1); border-color:#fff; color:#fff; }
+.screen-wrapper { position:relative; width:100%; aspect-ratio:9/19.5; overflow:hidden; border-radius:2px; background:var(--bg); touch-action:none; }
+.screen-wrapper img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+.screen-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+.screen-overlay.active { pointer-events:auto; cursor:crosshair; }
+.screen-hint { color:rgba(255,255,255,.3); font-size:12px; text-align:center; transition:opacity .8s; }
+.screen-footer { display:flex; justify-content:space-between; padding:6px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); background:rgba(0,0,0,.2); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Redroid Manager</h1>
+  <div class="host-stats" id="hostStats">加载中...</div>
+</header>
+
+<main>
+  <!-- APK Section -->
+  <div class="apk-section">
+    <h3>📦 APK 仓库</h3>
+    <div class="apk-toolbar">
+      <input type="file" id="apkFileInput" accept=".apk" style="display:none" onchange="uploadApk()">
+      <button class="btn btn-primary" onclick="document.getElementById('apkFileInput').click()">📤 上传 APK</button>
+      <button class="btn btn-primary" id="btnBatchInstall" disabled onclick="batchInstall()" style="background:var(--green);">📥 批量安装到所有实例</button>
+      <span id="selectedCount" style="font-size:12px;color:var(--dim);"></span>
+    </div>
+    <div id="apkList"></div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openCreateModal()">➕ 创建新实例</button>
+    <button class="btn btn-outline btn-sm" onclick="refreshAll()">🔄 刷新</button>
+    <span style="color:var(--dim);font-size:12px;">自动刷新: 5秒</span>
+  </div>
+
+  <div id="instanceTable"></div>
+</main>
+
+<!-- Screen Modal -->
+<div class="modal-overlay" id="screenModal">
+  <div class="screen-container">
+    <div class="screen-toolbar">
+      <span id="screenTitle">🖥 投屏</span>
+      <div class="screen-toolbar-right">
+        <span id="screenFps" class="fps-badge">—</span>
+        <div class="nav-btn-inline" onclick="sendKey(4)" title="返回">◀</div>
+        <div class="nav-btn-inline" onclick="sendKey(3)" title="主页">●</div>
+        <div class="nav-btn-inline" onclick="sendKey(187)" title="多任务">■</div>
+        <button class="btn btn-sm btn-outline" onclick="rotateScreen()" title="旋转">↻</button>
+        <button class="btn btn-sm btn-outline" onclick="togglePhoneFrame()" title="切换边框">▣</button>
+        <button class="btn btn-sm btn-outline" onclick="closeScreen()">✕</button>
+      </div>
+    </div>
+    <div class="screen-body">
+      <div class="phone-frame" id="phoneFrame">
+        <div class="phone-notch"></div>
+        <div class="screen-wrapper" id="screenWrapper">
+          <img id="screenImg" src="" alt="Android Screen" draggable="false">
+          <div class="screen-overlay" id="screenOverlay">
+            <div class="screen-hint" id="screenHint">👆 点击操控 | 拖动滑动 | 滚轮翻页</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-footer">
+      <span>🖱 点击=触摸 | 拖动=滑动 | 滚轮=翻页 | ESC=关闭</span>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h2>创建新实例</h2>
+    <div class="form-group"><label>实例名称 (留空自动生成)</label><input id="fName" placeholder="phone_N"></div>
+    <div class="form-group"><label>Android 版本</label>
+      <select id="fImage" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>宽度</label><input id="fWidth" type="number" value="720"></div>
+      <div class="form-group"><label>高度</label><input id="fHeight" type="number" value="1280"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>DPI</label><input id="fDpi" type="number" value="320"></div>
+      <div class="form-group"><label>FPS</label><input id="fFps" type="number" value="30"></div>
+    </div>
+    <div class="form-group"><label>ADB 端口 (留空自动分配)</label><input id="fPort" type="number" placeholder="5555+"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeCreateModal()">取消</button>
+      <button class="btn btn-primary" onclick="createInstance()">创建</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "";
+async function api(url, opts={}) { try { const r = await fetch(API+url, opts); return await r.json(); } catch(e) { toast("网络错误: "+e.message, "error"); return null; } }
+function toast(msg, type="success") { const el = document.createElement("div"); el.className = "toast toast-"+type; el.textContent = msg; document.body.appendChild(el); setTimeout(()=>el.remove(), 3000); }
+function copyText(text) { navigator.clipboard.writeText(text).then(()=>toast("已复制: "+text)); }
+
+async function refreshAll() { await Promise.all([loadInstances(), loadApks(), loadHost()]); }
+async function loadHost() { const d = await api("/api/host/stats"); if(d) document.getElementById("hostStats").innerHTML = `<span>总数: <b>${d.total}</b></span><span>运行中: <b style="color:var(--green)">${d.running}</b></span><span>已停止: <b>${d.stopped}</b></span>`; }
+
+async function loadInstances() {
+  let data = await api("/api/instances");
+  if(!data||!data.length) { document.getElementById("instanceTable").innerHTML = `<div class="empty-state"><p>📱 还没有实例</p><button class="btn btn-primary" onclick="openCreateModal()">创建第一个实例</button></div>`; return; }
+  let html = `<table><thead><tr><th>名称</th><th>状态</th><th>Android</th><th>启动</th><th>ADB</th><th>CPU</th><th>内存</th><th>操作</th></tr></thead><tbody>`;
+  for(const i of data) {
+    const badge = i.status=="running"?"status-running":i.status=="exited"?"status-stopped":"status-other";
+    const st = i.status=="running"?"运行中":i.status=="exited"?"已停止":i.status;
+    const boot = i.booted=="✅"?" ✅":"⏳"==i.booted?" ⏳":" —";
+    const actions = i.status=="running"
+          ? `<button class="btn btn-outline btn-sm" onclick="openScreen('${i.name}')">投屏</button>
+             <button class="btn btn-outline btn-sm" onclick="actionInstance('${i.name}','stop')">停止</button>
+             <button class="btn btn-outline btn-sm" onclick="actionInstance('${i.name}','restart')">重启</button>`
+          : `<button class="btn btn-outline btn-sm" onclick="actionInstance('${i.name}','start')">启动</button>`;
+        html += `<tr><td><b>${i.name}</b></td><td><span class="status-badge ${badge}">${st}</span></td><td>${i.android_ver}${boot}</td><td style="font-size:11px;color:var(--dim)">${i.started||"—"}</td><td><span class="adb-cmd" onclick="copyText('adb connect 192.168.9.53:${i.adb_port}')" title="复制">📋 :${i.adb_port}</span></td><td>${i.cpu_pct}%</td><td>${i.mem_mb}M</td><td>${actions} <button class="btn btn-outline btn-sm" onclick="cloneInstance('${i.name}')">克隆</button> <button class="btn btn-danger btn-sm" onclick="deleteInstance('${i.name}')">删除</button></td></tr>`;
+  }
+  document.getElementById("instanceTable").innerHTML = html+"</tbody></table>";
+}
+async function actionInstance(name, action) { await api(`/api/instances/${name}/${action}`,{method:"POST"}); loadInstances(); loadHost(); }
+async function deleteInstance(name) { if(!confirm(`删除 ${name} 及数据卷？不可恢复！`)) return; await api(`/api/instances/${name}`,{method:"DELETE"}); loadInstances(); loadHost(); }
+async function cloneInstance(name) {
+  if(!confirm(`克隆 ${name}？将使用相同配置创建新实例。`)) return;
+  const r = await api(`/api/instances/${name}/clone`, {method:"POST"});
+  if(r) toast(r.error||r.message||"克隆成功", r.error?"error":"success");
+  loadInstances(); loadHost();
+}
+function openCreateModal() {
+  document.getElementById("createModal").classList.add("active");
+  loadImageOptions();
+}
+async function loadImageOptions() {
+  const sel = document.getElementById("fImage");
+  const imgs = await api("/api/images");
+  if (!imgs || !imgs.length) { sel.innerHTML = '<option>无法获取镜像列表</option>'; return; }
+  sel.innerHTML = imgs.map(i =>
+    `<option value="${i.image}">${i.desc} ${i.cached ? '✅ 已缓存' : '⬇️ 需下载'}</option>`
+  ).join("");
+  // 默认选中第一个已缓存的
+  const cached = imgs.find(i => i.cached);
+  if (cached) sel.value = cached.image;
+}
+function closeCreateModal() { document.getElementById("createModal").classList.remove("active"); }
+async function createInstance() {
+  const d = {
+    name: document.getElementById("fName").value,
+    image: document.getElementById("fImage").value,
+    width: parseInt(document.getElementById("fWidth").value)||720,
+    height: parseInt(document.getElementById("fHeight").value)||1280,
+    dpi: parseInt(document.getElementById("fDpi").value)||320,
+    fps: parseInt(document.getElementById("fFps").value)||30,
+    adb_port: parseInt(document.getElementById("fPort").value)||0
+  };
+  const r = await api("/api/instances",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
+  if(r) { toast(r.error||r.message||"创建成功", r.error?"error":"success"); if(!r.error) closeCreateModal(); loadInstances(); loadHost(); }
+}
+
+// ── APK ──
+async function loadApks() {
+  const data = await api("/api/apk/list"), c = document.getElementById("apkList");
+  if(!data||!data.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px;">暂无 APK，点击上方按钮上传</div>'; document.getElementById("btnBatchInstall").disabled = true; return; }
+  let html = `<table class="apk-table"><thead><tr><th style="width:30px"><input type="checkbox" class="checkbox" onchange="toggleAllApks(this)" title="全选"></th><th>APK 文件</th><th style="width:80px">大小</th><th style="width:100px">上传时间</th><th style="width:80px">操作</th></tr></thead><tbody>`;
+  for(const a of data) {
+    html += `<tr><td><input type="checkbox" class="checkbox apk-check" data-apk="${a.name}" onchange="updateSelectedCount()"></td><td>📦 ${a.name}</td><td>${a.size_mb} MB</td><td style="font-size:11px;color:var(--dim)">${a.uploaded}</td><td class="apk-actions"><button class="btn btn-outline btn-sm" onclick="installOneApk('${a.name}')" title="安装">📥</button><button class="btn btn-outline btn-sm" onclick="deleteApk('${a.name}')" title="删除" style="color:var(--red)">✕</button></td></tr>`;
+  }
+  c.innerHTML = html+"</tbody></table>";
+  updateSelectedCount();
+}
+function toggleAllApks(el) { document.querySelectorAll(".apk-check").forEach(cb=>{ cb.checked = el.checked; }); updateSelectedCount(); }
+function updateSelectedCount() {
+  const s = [...document.querySelectorAll(".apk-check:checked")].map(c=>c.dataset.apk);
+  document.getElementById("selectedCount").textContent = s.length ? `已选 ${s.length} 个` : "";
+  document.getElementById("btnBatchInstall").disabled = s.length === 0;
+}
+async function uploadApk() {
+  const file = document.getElementById("apkFileInput").files[0]; if(!file) return;
+  
+  // Create inline progress
+  const bar = document.createElement("div");
+  bar.style.cssText = "margin-top:10px;display:flex;align-items:center;gap:10px;";
+  bar.innerHTML = `<span style="font-size:12px;color:var(--dim);">📤 ${file.name}</span>
+    <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+      <div id="uploadBar" style="width:0%;height:100%;background:var(--accent);transition:width .2s;"></div>
+    </div>
+    <span id="uploadPct" style="font-size:11px;color:var(--dim);white-space:nowrap;">0%</span>`;
+  const apkToolbar = document.querySelector(".apk-toolbar");
+  apkToolbar.after(bar);
+  
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", API+"/api/apk/upload");
+    const fd = new FormData(); fd.append("file", file);
+    
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round(e.loaded / e.total * 100);
+        document.getElementById("uploadBar").style.width = pct + "%";
+        document.getElementById("uploadPct").textContent = pct + "%";
+      }
+    };
+    
+    xhr.onload = () => {
+      try { const r = JSON.parse(xhr.responseText); bar.remove();
+        toast(r.error||r.message||"上传成功", r.error?"error":"success"); loadApks(); resolve();
+      } catch(e) { bar.remove(); toast("上传失败", "error"); reject(); }
+    };
+    
+    xhr.onerror = () => { bar.remove(); toast("上传失败", "error"); reject(); };
+    xhr.send(fd);
+  });
+  
+  document.getElementById("apkFileInput").value = "";
+}
+async function deleteApk(filename) { if(!confirm(`永久删除 ${filename}？`)) return; await api(`/api/apk/${filename}`,{method:"DELETE"}); loadApks(); }
+async function installOneApk(apk) {
+  const instances = await api("/api/instances"); if(!instances) return;
+  const running = instances.filter(i=>i.status==="running");
+  if(!running.length) return toast("没有运行中的实例", "error");
+  const targets = running.length>1 ? (confirm(`要安装到全部 ${running.length} 个实例吗？\n取消则只装到第1个`) ? running.map(i=>i.name) : [running[0].name]) : [running[0].name];
+  await doInstall(apk, targets);
+}
+async function batchInstall() {
+  const selected = [...document.querySelectorAll(".apk-check:checked")].map(c=>c.dataset.apk);
+  if(!selected.length) return toast("请先勾选 APK", "error");
+  const instances = await api("/api/instances"); if(!instances) return;
+  const running = instances.filter(i=>i.status==="running").map(i=>i.name);
+  if(!running.length) return toast("没有运行中的实例", "error");
+  const apk = selected[0];
+  if(!confirm(`将「${apk}」安装到 ${running.length} 个实例？`)) return;
+  await doInstall(apk, running);
+}
+async function doInstall(apk, targets) {
+  const btn = document.getElementById("btnBatchInstall");
+  btn.disabled = true;
+  
+  // Create progress overlay
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay active";
+  overlay.innerHTML = `<div class="modal" style="width:400px;text-align:center;">
+    <h3>📦 正在安装 ${apk}</h3>
+    <div style="margin:16px 0;">
+      <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+        <div id="installBar" style="width:0%;height:100%;background:var(--accent);transition:width .3s;"></div>
+      </div>
+    </div>
+    <div id="installMsg" style="font-size:13px;color:var(--dim);margin:8px 0;">提交任务...</div>
+    <div id="installDetail" style="font-size:11px;color:var(--dim);text-align:left;max-height:200px;overflow-y:auto;margin-top:12px;"></div>
+    <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="installClose" disabled onclick="this.parentElement.parentElement.remove()">关闭</button>
+  </div>`;
+  document.body.appendChild(overlay);
+  
+  const bar = document.getElementById("installBar");
+  const msg = document.getElementById("installMsg");
+  const detail = document.getElementById("installDetail");
+  const closeBtn = document.getElementById("installClose");
+  
+  // Start install job
+  msg.textContent = "提交任务...";
+  const r = await api("/api/apk/install", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({apk, targets})
+  });
+  
+  if (!r || r.error) { msg.textContent = "❌ "+(r?.error||"提交失败"); closeBtn.disabled=false; btn.disabled=false; return; }
+  
+  const jobId = r.job_id;
+  
+  // Poll progress
+  let done = false;
+  while (!done) {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const s = await api(`/api/apk/install/${jobId}`);
+    if (!s) break;
+    
+    const pct = Math.round(s.done / s.total * 100);
+    bar.style.width = pct + "%";
+    msg.textContent = s.message;
+    
+    if (s.results && s.results.length > 0) {
+      detail.innerHTML = s.results.map(r => 
+        `<div style="padding:4px 0;border-bottom:1px solid var(--border);">
+          <b>${r.name}</b>: <span style="color:${r.status==='success'?'var(--green)':'var(--red)'}">${r.status==='success'?'✅ ':'❌ '}${r.msg}${r.package?' ('+r.package+')':''}</span>
+        </div>`
+      ).join("");
+    }
+    
+    if (s.status === "done") { done = true; }
+  }
+  
+  closeBtn.disabled = false;
+  btn.disabled = false;
+  btn.textContent = "📥 批量安装到所有实例";
+  loadApks();
+}
+
+// ── Screen ──
+let screenName = "", fpsRunning = false;
+
+function openScreen(name) {
+  screenName = name;
+  document.getElementById("screenTitle").textContent = `🖥 ${name}`;
+  document.getElementById("screenImg").src = API+"/api/instances/"+name+"/screen";
+  document.getElementById("screenModal").classList.add("active");
+  document.getElementById("screenOverlay").classList.add("active");
+  
+  fpsRunning = true;
+  (async function fpsLoop() {
+    const badge = document.getElementById("screenFps");
+    badge.textContent = "连接中..."; badge.className = "fps-badge";
+    let frameCount = 0, lastCheck = Date.now();
+    while(fpsRunning && document.getElementById("screenModal").classList.contains("active")) {
+      try {
+        const r = await fetch(API+"/api/instances/"+name+"/screen");
+        const reader = r.body.getReader();
+        while(fpsRunning) { const {value, done} = await reader.read(); if(done) break; frameCount++; const now = Date.now(); if(now-lastCheck>=2000) { const fps = Math.round(frameCount/((now-lastCheck)/1000)); badge.textContent = fps+" FPS"; badge.className = "fps-badge"+(fps<1?" error":""); frameCount=0; lastCheck=now; } }
+        reader.cancel();
+      } catch(e) { if(fpsRunning) { badge.textContent="重连中..."; badge.className="fps-badge error"; } await new Promise(r=>setTimeout(r,1000)); }
+    }
+  })();
+  
+  setupScreenInput();
+  document.addEventListener("keydown", screenKeyHandler);
+}
+
+function closeScreen(e) {
+  if(e && e.target !== document.getElementById("screenModal")) return;
+  fpsRunning = false;
+  document.getElementById("screenModal").classList.remove("active");
+  document.getElementById("screenImg").src = "";
+  document.removeEventListener("keydown", screenKeyHandler);
+}
+
+function screenKeyHandler(e) {
+  if(!document.getElementById("screenModal").classList.contains("active")) return;
+  if(e.key==="Escape") { closeScreen(); return; }
+  const keyMap = { "Enter":66, "Backspace":67, " ":62, "ArrowUp":19, "ArrowDown":20, "ArrowLeft":21, "ArrowRight":22 };
+  if(keyMap[e.key]) { e.preventDefault(); sendKey(keyMap[e.key]); return; }
+  if(e.key.length===1&&!e.ctrlKey&&!e.altKey&&!e.metaKey) { e.preventDefault(); sendText(e.key); }
+}
+
+async function sendKey(code) { await api(`/api/instances/${screenName}/input`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"key",code})}); }
+async function sendText(text) { await api(`/api/instances/${screenName}/input`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"text",text:text.replace(/'/g,"\\'")})}); }
+
+function setupScreenInput() {
+  const el = document.getElementById("screenOverlay");
+  const img = document.getElementById("screenImg");
+  let down = null, moved = false;
+  
+  function pos(e) {
+    const r = img.getBoundingClientRect();
+    return { x: Math.round((e.clientX-r.left)/r.width*720), y: Math.round((e.clientY-r.top)/r.height*1280) };
+  }
+  
+  el.onpointerdown = (e) => { e.preventDefault(); down = pos(e); moved = false; el.setPointerCapture(e.pointerId); };
+  
+  el.onpointermove = (e) => {
+    if(!down) return;
+    const cur = pos(e);
+    if(Math.abs(cur.x-down.x)>5||Math.abs(cur.y-down.y)>5) moved = true;
+  };
+  
+  el.onpointerup = (e) => {
+    if(!down) return;
+    const cur = pos(e);
+    if(moved) { sendSwipe(down.x, down.y, cur.x, cur.y); }
+    else { sendTap(down.x, down.y); }
+    down = null; moved = false;
+  };
+  
+  el.onwheel = (e) => { e.preventDefault(); sendSwipe(360, 700, 360, 700+(e.deltaY>0?-300:300)); };
+}
+
+async function sendTap(x, y) { await api(`/api/instances/${screenName}/input`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"tap",x,y})}); }
+async function sendSwipe(x1, y1, x2, y2) { await api(`/api/instances/${screenName}/input`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"swipe",x1,y1,x2,y2})}); }
+function rotateScreen() { document.getElementById("phoneFrame").classList.toggle("landscape"); }
+function togglePhoneFrame() { document.getElementById("phoneFrame").classList.toggle("naked"); }
+
+// ── Init ──
+refreshAll();
+setInterval(refreshAll, 5000);
+</script>
+</body>
+</html>
